@@ -145,7 +145,29 @@ class NeuralNetwork:
 
         return T_guessed, accuracy_pos, accuracy_neg, accuracy
 
-    def train(self,X,T,show=False):
+    def train(self,X,T,X_valid,T_valid,show=False):
+        mses, mses_valid = [], []
+        errors, errors_valid = [], []
+        for i in range(self.n_epochs) :
+            # Perform weights update
+            self.forward_pass(X)
+            self.backward_pass(T)
+            self.weights_update(X)
+
+            # Compute missclassification
+            T_guessed,accuracy_pos, accuracy_neg, accuracy = self.classify(X,T,show)
+            errors.append(100-accuracy)
+            mses.append(np.sum(np.square(self.O-T))/np.shape(T))
+
+            # Compute missclassification for validation data
+            T_guessed_valid,accuracy_pos_valid, accuracy_neg_valid, accuracy_valid = self.classify(X_valid,T_valid,show)
+            errors_valid.append(100-accuracy_valid)
+            O_valid = self.forward_pass(X_valid)
+            mses_valid.append(np.sum(np.square(O_valid-T_valid))/np.shape(T_valid))
+        
+        return errors, mses, errors_valid, mses_valid
+
+    def validate(self,X,T,show=False) :
         mses = []
         errors = []
         for i in range(self.n_epochs) :
@@ -212,11 +234,13 @@ def plot_data_boundary(X,T,sampling_pattern,boundary_samples,L) :
     ax.set_title('Sampled Decision Boundary')
     plt.show()
 
-def plot_error(errors,title) :
+def plot_error(errors,errors_valid,title) :
     fig, ax = plt.subplots()
     ax.grid(visible = True)
     ax.set_title(title+' over epochs')
-    ax.plot(errors)
+    ax.plot(errors,label='Training')
+    ax.plot(errors_valid,label='Validation')
+    ax.legend()
     ax.set_xlabel('Epoch')
     ax.set_ylabel(title)
     plt.show()
@@ -234,21 +258,61 @@ def gen_data_clusters(N, mean_A1, mean_A2, cov_A, mean_B, cov_B) :
 
     return X_A,X_B
 
-def subsample_mix_classes(X_A,X_B,f_A,fB) :
+def subsample_mix_classes(X_A,X_B,f_A,f_B) :
     # Subsample classes
-    random_subs_indices = np.random.choice(N, size=int(N*0.75), replace=False)
-    X_A_subs = X_A[:,random_subs_indices]
-    X_B_subs = X_B[:,random_subs_indices]
-    X_A_disc = X_A[:,[i for i in range(N) if i not in random_subs_indices]]
-    X_B_disc = X_B[:,[i for i in range(N) if i not in random_subs_indices]]
-
+    N_A, N_B = np.shape(X_A)[1], np.shape(X_B)[1]
+    random_subs_indices_A = np.random.choice(N_A, size=int(N_A*f_A), replace=False)
+    random_subs_indices_B = np.random.choice(N_B, size=int(N_B*f_B), replace=False)
+    X_A_train = X_A[:,random_subs_indices_A]
+    X_B_train = X_B[:,random_subs_indices_B]
+    X_A_valid = X_A[:,[i for i in range(N_A) if i not in random_subs_indices_A]]
+    X_B_valid = X_B[:,[i for i in range(N_B) if i not in random_subs_indices_B]]
+    
     # Mix classes
-    random_col_indices = np.random.choice(int(1.5*N), size=int(1.5*N), replace=False)
-    X_subs = np.append(X_A_subs,X_B_subs,axis=1)[:,random_col_indices]
-    X_disc = np.append(X_A_disc,X_B_disc,axis=1)
+    N_train = np.shape(X_A_train)[1] + np.shape(X_B_train)[1]
+    N_valid = np.shape(X_A_valid)[1] + np.shape(X_B_valid)[1]
+    random_col_indices_train = np.random.choice(N_train, size=N_train, replace=False)
+    random_col_indices_valid = np.random.choice(N_valid, size=N_valid, replace=False)
+    X_train = np.append(X_A_train,X_B_train,axis=1)[:,random_col_indices_train]
+    X_valid = np.append(X_A_valid,X_B_valid,axis=1)[:,random_col_indices_valid]
 
     # Define labels vector
-    T = X_subs[-1,:]
-    X_subs = X_subs[:-1,:]
-    T_disc = X_disc[-1,:]
-    X_disc = X_disc[:-1,:]
+    T_train = X_train[-1,:]
+    X_train = X_train[:-1,:]
+    T_valid = X_valid[-1,:]
+    X_valid = X_valid[:-1,:]
+
+    return T_train, X_train, T_valid, X_valid
+
+def subsample_mix_classes_complex(X_A,X_B,f_A,f_B,f_posneg) :
+    # Separate between positive and negative
+    X_A_pos = X_A[:,X_A[0,:] > 0]
+    X_A_neg = X_A[:,X_A[0,:] < 0]
+    
+    # Subsample classes
+    N_A_pos, N_A_neg, N_B = np.shape(X_A_pos)[1], np.shape(X_A_pos)[1], np.shape(X_B)[1]
+    random_subs_indices_A_pos = np.random.choice(N_A_pos, size=int(N_A_pos*f_posneg), replace=False)
+    random_subs_indices_A_neg = np.random.choice(N_A_neg, size=int(N_A_neg*(1-f_posneg)), replace=False)
+    random_subs_indices_B = np.random.choice(N_B, size=int(N_B*f_B), replace=False)
+    X_A_train = np.append(X_A_pos[:,random_subs_indices_A_pos],X_A_neg[:,random_subs_indices_A_neg],axis=1)
+    X_B_train = X_B[:,random_subs_indices_B]
+    X_A_valid = np.append(X_A_pos[:,[i for i in range(N_A_pos) if i not in random_subs_indices_A_pos]],X_A_neg[:,[i for i in range(N_A_neg) if i not in random_subs_indices_A_neg]],axis=1)
+    X_B_valid = X_B[:,[i for i in range(N_B) if i not in random_subs_indices_B]]
+
+    # Mix classes
+    N_train = np.shape(X_A_train)[1] + np.shape(X_B_train)[1]
+    N_valid = np.shape(X_A_valid)[1] + np.shape(X_B_valid)[1]
+    random_col_indices_train = np.random.choice(N_train, size=N_train, replace=False)
+    random_col_indices_valid = np.random.choice(N_valid, size=N_valid, replace=False)
+    X_train = np.append(X_A_train,X_B_train,axis=1)[:,random_col_indices_train]
+    X_valid = np.append(X_A_valid,X_B_valid,axis=1)[:,random_col_indices_valid]
+
+    # Define labels vector
+    T_train = X_train[-1,:]
+    X_train = X_train[:-1,:]
+    T_valid = X_valid[-1,:]
+    X_valid = X_valid[:-1,:]
+
+    return T_train, X_train, T_valid, X_valid
+
+
