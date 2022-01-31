@@ -144,8 +144,23 @@ class NeuralNetwork:
             print('Hits = {}, Fails = {}, Accuracy = {}%'.format(hits,fails,accuracy))
 
         return T_guessed, accuracy_pos, accuracy_neg, accuracy
+    
+    def classify_matrix(self,X,T,show=True) :
+        T_guessed = (self.forward_pass(X) > 0 )* 2 - 1
 
-    def train(self,X,T,X_valid,T_valid,show=False):
+        # Overall accuracy
+        hits = 0
+        for col in range(np.shape(T_guessed)[1]) :
+            hits += (T_guessed[:,col] == T[:,col]).sum() == np.shape(T)[0]
+        fails = np.shape(T)[0] - hits
+        accuracy = round(hits*100/np.shape(T)[0],3)
+
+        if show :
+            print('Hits = {}, Fails = {}, Accuracy = {}%'.format(hits,fails,accuracy))
+
+        return T_guessed, accuracy
+
+    def train(self,X,T,X_valid,T_valid,show=False,matrix=False):
         mses, mses_valid = [], []
         errors, errors_valid = [], []
         for i in range(self.n_epochs) :
@@ -155,12 +170,16 @@ class NeuralNetwork:
             self.weights_update(X)
 
             # Compute missclassification
-            T_guessed,accuracy_pos, accuracy_neg, accuracy = self.classify(X,T,show)
-            errors.append(100-accuracy)
-            mses.append(np.sum(np.square(self.O-T))/np.shape(T))
+            if not matrix :
+                T_guessed,accuracy_pos, accuracy_neg, accuracy = self.classify(X,T,show)
+                T_guessed_valid,accuracy_pos_valid, accuracy_neg_valid, accuracy_valid = self.classify(X_valid,T_valid,show)
+            else :
+                T_guessed, accuracy = self.classify_matrix(X,T,show)
+                T_guessed_valid, accuracy_valid = self.classify_matrix(X_valid,T_valid,show)
 
-            # Compute missclassification for validation data
-            T_guessed_valid,accuracy_pos_valid, accuracy_neg_valid, accuracy_valid = self.classify(X_valid,T_valid,show)
+            errors.append(100-accuracy)
+            mses.append(np.sum(np.square(self.forward_pass(X)-T))/np.shape(T))
+
             errors_valid.append(100-accuracy_valid)
             O_valid = self.forward_pass(X_valid)
             mses_valid.append(np.sum(np.square(O_valid-T_valid))/np.shape(T_valid))
@@ -314,5 +333,32 @@ def subsample_mix_classes_complex(X_A,X_B,f_A,f_B,f_posneg) :
     X_valid = X_valid[:-1,:]
 
     return T_train, X_train, T_valid, X_valid
+
+def generate_func_approx_data (N,feat_range,variance,bias,noise_variance=0):
+    def gaussian_2d(x,y,variance,bias,noise_variance) :
+        return np.exp(-(x**2 + y**2)/variance) + bias + np.random.normal(0, noise_variance)
+    x = np.linspace(feat_range[0], feat_range[1],int(np.sqrt(N)))
+    y = np.linspace(feat_range[0], feat_range[1], int(np.sqrt(N)))
+    X, T = [], []
+    for x_i in x :
+        for y_i in y :
+            X.append(np.array([x_i,y_i]))
+            T.append(gaussian_2d(x_i,y_i,variance,bias,noise_variance))
+    X = np.array(X).T
+    T = np.array(T)
+
+    X_grid, Y_grid = np.meshgrid(x, y)
+    Z_grid = np.reshape(T,(int(np.sqrt(N)),int(np.sqrt(N))))
+
+    return X,T,X_grid,Y_grid,Z_grid
+
+def subsample_function_data(X,T,f) :
+    N = np.shape(X)[1]
+    random_subs_indices = np.random.choice(N, size=int(N*f), replace=False)
+    X_train = X[:,random_subs_indices]
+    X_valid = X[:,[i for i in range(N) if i not in random_subs_indices]]
+    T_train = T[random_subs_indices]
+    T_valid = T[[i for i in range(N) if i not in random_subs_indices]]
+    return X_train, T_train, X_valid, T_valid
 
 
