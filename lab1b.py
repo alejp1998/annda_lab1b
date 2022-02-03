@@ -361,4 +361,18 @@ def subsample_function_data(X,T,f) :
     T_valid = T[[i for i in range(N) if i not in random_subs_indices]]
     return X_train, T_train, X_valid, T_valid
 
+def gen_mackey_glass_series(beta, tau, gamma, n, N) :
+    x = [1.5]
+    for t in range(1,N+1) :
+        x_tau = x[t-tau] if t >= tau else 0
+        x.append((1-gamma)*x[t-1] + (beta*x_tau)/(1 + x_tau**n))
+        if (t >= 25) and (t <= N) :
+            X_col = np.array([[x[t-25],x[t-20],x[t-15],x[t-10],x[t-5]]])
+            T_col = np.array([[x[t]]])
+            X = X_col if t == 25 else np.append(X,X_col,axis=0)
+            T = T_col if t == 25 else np.append(T,T_col,axis=0)
+
+    return x, X.T, T.T
+
+
 
