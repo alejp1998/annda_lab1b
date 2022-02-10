@@ -42,16 +42,23 @@ def CL_initialisation (x,dim,N,s,epochs,n_winners,lr):
     # x has dim rows and N_datapoints columns 
     # mu has dim rows and N_RBF (N) columns
     # sigma has 1 row with N_RBF (N) columns (std equal in all directions)
-    mu = np.random.uniform(x.min(-1),x.max(-1),(dim,N)) #initialise RBF's randomly uniform
-    sigma = s*np.ones((1,N))
+    if dim == 1:
+        mu = np.random.uniform(x.min(-1),x.max(-1),N) #Arrays act weird in python
+        sigma = s*np.ones(N)
+    else:
+        mu = np.random.uniform(x.min(-1),x.max(-1),size=(dim,N)) #initialise RBF's randomly uniform
+        sigma = s*np.ones((1,N))
 
     for k in range(epochs):
-        x = x[:, np.random.permutation(x.shape[-1])] #shuffle data order
+        x = x[np.random.permutation(x.shape[-1])] #shuffle data order
         for i in range(x.shape[-1]):
-            phi = RBF_multdim(x[:,i],mu,sigma)
-            for j in range(n_winners):
+            phi = lab2.RBF(x[i],mu,sigma)
+            for j in range(1,n_winners+1):
                 biggest = max(phi)
-                biggest_ind = phi.index(biggest)
-                mu[:,biggest_ind] = mu[:,biggest_ind] + lr/j(x[:,i] - mu[:,biggest_ind]) #move RBF closer to data point
-
+                biggest_ind = np.where(phi == biggest)
+                if dim == 1:
+                    mu[biggest_ind[0]] = mu[biggest_ind[0]] + lr/j*(x[i] - mu[biggest_ind[0]])
+                else:
+                    mu[:,biggest_ind][0] = mu[:,biggest_ind[0]] + lr/j*(x[:,i] - mu[:,biggest_ind[0]]) #move RBF closer to data point
+                phi[biggest_ind[0]] = -1
     return mu, sigma
