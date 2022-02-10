@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 def RBF (x, mu, sigma): #Kind of redundant, if input is defined correctly RBF_multdim can be used for 1D as well
     try: 
@@ -18,13 +17,8 @@ def RBF_multdim (x,mu,sigma):
         phi[:,i] = np.exp(-(np.linalg.norm(x-mu_col)**2)/(2*sigma[:,i]**2))
     return phi
 
-def least_squares (x,y_train,mu,sigma):
-    phi = RBF(x,mu,sigma)
-    w = np.transpose(phi).dot(y_train).dot(np.linalg.inv(np.dot(np.transpose(phi),phi)))
-    return w
-
 def delta_rule (x,y_train,mu,sigma,lr,epochs):
-    w = np.random.normal(0,1,N)
+    w = np.random.normal(0,1,mu.shape[-1])
     for i in range(epochs):
         ind = np.random.permutation(x.shape[-1]) #shuffle data order
         x =  x[ind]
@@ -33,6 +27,11 @@ def delta_rule (x,y_train,mu,sigma,lr,epochs):
             phi = RBF(x[k],mu,sigma)
             phi = phi[0,:]
             w = w + lr*(y_train[k] - np.sum(w*phi))*phi
+    return w
+
+def least_squares (x,y_train,mu,sigma):
+    phi = RBF(x,mu,sigma)
+    w = np.transpose(phi).dot(y_train).dot(np.linalg.inv(np.dot(np.transpose(phi),phi)))
     return w
 
 def forward (x,w,mu,sigma):
