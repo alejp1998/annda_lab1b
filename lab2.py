@@ -46,13 +46,14 @@ def CL_initialisation (x,dim,N,s,epochs,n_winners,lr):
         mu = np.random.uniform(x.min(-1),x.max(-1),N) #Arrays act weird in python
         sigma = s*np.ones(N)
     else:
-        mu = np.random.uniform(x.min(-1),x.max(-1),size=(dim,N)) #initialise RBF's randomly uniform
+        #mu = np.random.uniform(x.min(-1),x.max(-1),size=(dim,N)) #initialise RBF's randomly uniform
+        np.random.uniform(np.array([x.min(-1)]).T,np.array([x.max(-1)]).T,(2,30))
         sigma = s*np.ones((1,N))
 
     for k in range(epochs):
         x = x[np.random.permutation(x.shape[-1])] #shuffle data order
         for i in range(x.shape[-1]):
-            phi = lab2.RBF(x[i],mu,sigma)
+            phi = RBF(x[i],mu,sigma)
             for j in range(1,n_winners+1):
                 biggest = max(phi)
                 biggest_ind = np.where(phi == biggest)
